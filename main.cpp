@@ -1,9 +1,49 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 #include <iomanip>
 #include <sstream>
 #include <iostream>
 #include <fstream>
 #include <map>
+#include <vector>
 #include "ConsoleTable.h"
+
+struct Labels {
+    std::string memoryTitle;
+    std::string swapTitle;
+    std::string totalsTitle;
+    std::string total;
+    std::string used;
+    std::string free;
+    std::string buffCache;
+    std::string available;
+    std::string usePercent;
+};
+
+Labels getLabels(){
+    return {"Memory", "Swap", "Totals", "TOTAL", "USED", "FREE", "BUF/CACHE", "AVAILABLE", "USE%"};
+}
+
+void printHelp(){
+    std::cout << "Usage: superfree [OPTIONS]\n\n"
+              << "Display Linux memory, swap, and total usage in a colored table.\n\n"
+              << "Options:\n"
+              << "  -h, --help              Show this help and exit.\n"
+              << "  --unit UNIT             Force output unit: auto, kB, KiB, MiB, GiB, TiB.\n"
+              << "  --color WHEN            Control colored output: always, auto, never (default: always).\n"
+              << "  --human                 Use automatic human-readable units (default).\n\n"
+              << "Color thresholds:\n"
+              << "  green < 60%, yellow 60-89%, red >= 90%.\n\n"
+              << "Examples:\n"
+              << "  superfree\n"
+              << "  superfree --color never\n"
+              << "  superfree --unit kB\n"
+              << "  superfree --unit GiB\n";
+}
+
+struct ColorSettings {
+    bool enabled = true;
+};
 
 class MemInfo {
 private:
@@ -41,20 +81,20 @@ private:
 
 
     std::string getColor(const std::string &percentage){
-        std::string color = "\e[38;5;148m"; //green
+        std::string color = "\x1b[38;5;148m"; //green
         if (std::stof(percentage) < 60)
-            color = "\e[38;5;148m";
+            color = "\x1b[38;5;148m";
         if ((std::stof(percentage) >= 60) && (std::stof(percentage) < 90))
-            color = "\e[38;5;226m";
+            color = "\x1b[38;5;226m";
         if (std::stof(percentage) >= 90)
-            color = "\e[38;5;197m";
+            color = "\x1b[38;5;197m";
         return color;
     }
 
     std::string genericPrintBar(const std::string &used, const std::string &total) {
         std::string percentageUsed = calculatePercentage(used, total);
         int numberHash = calculateNumberHash(used, total);
-        std::string result = getColor(percentageUsed);
+        std::string result = colorSettings.enabled ? getColor(percentageUsed) : "";
         for(int i = 0; i<24; i++){
             if(i == 0)
                 result = result + "[";
@@ -65,7 +105,7 @@ private:
             if (i == 23)
                 result = result + "]";
         }
-        return result + " " + percentageUsed + " %\e[0m";
+        return result + " " + percentageUsed + " %" + (colorSettings.enabled ? "\x1b[0m" : "");
     }
 
 
@@ -78,7 +118,12 @@ private:
         }
 
         std::string calculatePercentage(const std::string &used, const std::string &total){
-            float x = (std::stol(used) * 100) / std::stol(total);
+            const long totalValue = std::stol(total);
+            if (totalValue == 0) {
+                return "0.0";
+            }
+
+            float x = (std::stol(used) * 100.0f) / totalValue;
             std::stringstream stream;
             stream << std::fixed << std::setprecision(1) << x;
             return stream.str();
@@ -142,6 +187,8 @@ public:
     std::string TotalUsed;
     std::string TotalFree;
     std::string dataType;
+    std::string outputUnit = "auto";
+    ColorSettings colorSettings;
 
     enum barOptions {
         bOption_Invalid,
@@ -152,7 +199,7 @@ public:
 
     MemInfo() {
         readFile();
-        dataType = "kB";
+        dataType = "";
         long l_memUsed = std::stol(memTotal) - std::stol(memAvailable);
         memUsed = std::to_string(l_memUsed);
         long l_buffCached = std::stol(memBuffers) + std::stol(memCached);
@@ -165,6 +212,62 @@ public:
         TotalUsed = std::to_string(l_TotalUsed);
         long l_TotalFree = std::stol(memFree) + std::stol(swapFree);
         TotalFree = std::to_string(l_TotalFree);
+    }
+
+    void setHumanReadable(bool enabled){
+        outputUnit = enabled ? "auto" : "kB";
+    }
+
+    void setOutputUnit(const std::string &unit){
+        outputUnit = unit;
+    }
+
+    void setColorSettings(const ColorSettings &settings){
+        colorSettings = settings;
+    }
+
+    std::string getUsageColor(const std::string &used, const std::string &total){
+        if (!colorSettings.enabled)
+            return "";
+        return getColor(calculatePercentage(used, total));
+    }
+
+    std::string resetColor() const{
+        return colorSettings.enabled ? "\x1b[0m" : "";
+    }
+
+    std::string formatValue(const std::string &value) const{
+        if (outputUnit == "kB")
+            return value + " kB";
+
+        if (outputUnit == "KiB")
+            return value + " KiB";
+
+        if (outputUnit == "MiB" || outputUnit == "GiB" || outputUnit == "TiB") {
+            double converted = std::stol(value);
+            if (outputUnit == "MiB")
+                converted = converted / 1024.0;
+            if (outputUnit == "GiB")
+                converted = converted / 1024.0 / 1024.0;
+            if (outputUnit == "TiB")
+                converted = converted / 1024.0 / 1024.0 / 1024.0;
+
+            std::stringstream stream;
+            stream << std::fixed << std::setprecision(1) << converted << " " << outputUnit;
+            return stream.str();
+        }
+
+        double bytes = std::stol(value) * 1024.0;
+        const std::vector<std::string> units{"B", "KiB", "MiB", "GiB", "TiB"};
+        size_t unitIndex = 0;
+        while (bytes >= 1024.0 && unitIndex < units.size() - 1) {
+            bytes = bytes / 1024.0;
+            unitIndex++;
+        }
+
+        std::stringstream stream;
+        stream << std::fixed << std::setprecision(1) << bytes << " " << units[unitIndex];
+        return stream.str();
     }
 
     void readFile(){
@@ -211,51 +314,79 @@ public:
 
 
 
-int main() {
+int main(int argc, char *argv[]) {
+
+    bool showHelp = false;
+    ColorSettings colorSettings;
+
+    for (int i = 1; i < argc; i++) {
+        std::string argument = argv[i];
+        if (argument == "--help" || argument == "-h") {
+            showHelp = true;
+        }
+    }
+
+    if (showHelp) {
+        printHelp();
+        return 0;
+    }
 
     MemInfo info = MemInfo();
+    Labels labels = getLabels();
 
-    ConsoleTable tableMemory{"TOTAL", "USED", "FREE", "BUF/CACHE", "AVAILABLE", "USE%"};
+    for (int i = 1; i < argc; i++) {
+        std::string argument = argv[i];
+        if (argument == "--human") {
+            info.setHumanReadable(true);
+        } else if (argument == "--unit" && i + 1 < argc) {
+            info.setOutputUnit(argv[++i]);
+        } else if (argument == "--color" && i + 1 < argc) {
+            std::string mode = argv[++i];
+            if (mode == "never") {
+                colorSettings.enabled = false;
+            } else if (mode == "always" || mode == "auto") {
+                colorSettings.enabled = true;
+            }
+        }
+    }
+    info.setColorSettings(colorSettings);
+
+    std::string memoryColor = info.getUsageColor(info.memUsed, info.memTotal);
+    std::string swapColor = info.getUsageColor(info.swapUsed, info.swapTotal);
+    std::string totalsColor = info.getUsageColor(info.TotalUsed, info.Total);
+    std::string reset = info.resetColor();
+
+    ConsoleTable tableMemory{"TYPE", labels.total, labels.used, labels.free, labels.buffCache, labels.available, labels.usePercent};
 
     tableMemory.setPadding(1);
     tableMemory.setStyle(4);
 
-    tableMemory += {"\e[38;5;75m" +info.memTotal + " " + info.dataType  + "\e[0m",
-            info.memUsed + " " + info.dataType,
-            info.memFree + " " + info.dataType,
-            info.buffCached + " " + info.dataType,
-            info.memAvailable + " " + info.dataType,
+    tableMemory += {memoryColor + labels.memoryTitle + reset,
+            memoryColor + info.formatValue(info.memTotal) + reset,
+            memoryColor + info.formatValue(info.memUsed) + reset,
+            info.formatValue(info.memFree),
+            info.formatValue(info.buffCached),
+            info.formatValue(info.memAvailable),
             info.printBar(1)};
 
-    tableMemory.setTittle("Memory");
-    std::cout << tableMemory;
-
-    ConsoleTable tableSwap{"TOTAL", "USED", "FREE", "USE%"};
-
-    tableSwap.setPadding(1);
-    tableSwap.setStyle(4);
-
-    tableSwap += {"\e[38;5;75m" + info.swapTotal + " " + info.dataType  + "\e[0m",
-            info.swapUsed + " " + info.dataType,
-            info.swapFree + " " + info.dataType,
+    tableMemory += {swapColor + labels.swapTitle + reset,
+            swapColor + info.formatValue(info.swapTotal) + reset,
+            swapColor + info.formatValue(info.swapUsed) + reset,
+            info.formatValue(info.swapFree),
+            "-",
+            "-",
             info.printBar(2)};
 
-
-    tableSwap.setTittle("Swap");
-    std::cout << tableSwap;
-
-    ConsoleTable tableTotals{"TOTAL", "USED", "FREE", "USE%"};
-
-    tableTotals.setPadding(1);
-    tableTotals.setStyle(4);
-
-    tableTotals += {"\e[38;5;75m" + info.Total + " " + info.dataType + "\e[0m",
-            info.TotalUsed + " " + info.dataType,
-            info.TotalFree + " " + info.dataType,
+    tableMemory += {totalsColor + labels.totalsTitle + reset,
+            totalsColor + info.formatValue(info.Total) + reset,
+            totalsColor + info.formatValue(info.TotalUsed) + reset,
+            info.formatValue(info.TotalFree),
+            "-",
+            "-",
             info.printBar(3)};
 
-    tableTotals.setTittle("Totals");
-    std::cout << tableTotals;
+    tableMemory.setTittle("Memory Usage");
+    std::cout << tableMemory;
 
     return 0;
 }

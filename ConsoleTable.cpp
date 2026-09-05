@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 #include "ConsoleTable.h"
 
 
@@ -46,14 +48,14 @@ bool ConsoleTable::addRow(std::initializer_list<std::string> row) {
     auto r = std::vector<std::string>{row};
     rows.push_back(r);
     for (unsigned int i = 0; i < r.size(); ++i) {
-        widths[i] = std::max(r[i].size() - searchColor(r[i]), widths[i]);
+        widths[i] = std::max(visibleLength(r[i]), widths[i]);
     }
     return true;
 }
 
 
 bool ConsoleTable::removeRow(unsigned int index) {
-    if (index > rows.size())
+    if (index >= rows.size())
         return false;
 
     rows.erase(rows.begin() + index);
@@ -72,7 +74,7 @@ ConsoleTable &ConsoleTable::operator+=(std::initializer_list<std::string> row) {
 
 
 ConsoleTable &ConsoleTable::operator-=(const uint32_t rowIndex) {
-    if (rows.size() < rowIndex)
+    if (rowIndex >= rows.size())
         throw std::out_of_range{"Row index out of range."};
 
     removeRow(rowIndex);
@@ -97,7 +99,7 @@ std::string ConsoleTable::getHeaders(const Headers &headers) const {
     line << style.vertical;
     for (unsigned int i = 0; i < headers.size(); ++i) {
         std::string text = headers[i];
-        line << SPACE_CHARACTER * padding + text + SPACE_CHARACTER * (widths[i] - text.length() + searchColor(text)) + SPACE_CHARACTER * padding;
+        line << SPACE_CHARACTER * padding + text + SPACE_CHARACTER * (widths[i] - visibleLength(text)) + SPACE_CHARACTER * padding;
         line << style.vertical;
     }
     line << "\n";
@@ -139,28 +141,13 @@ size_t ConsoleTable::calculateDiference(int &diference, size_t width, const std:
 std::string ConsoleTable::getTittle(const std::string &tittle) const {
     std::stringstream line;
     line << style.vertical;
-    std::string text = tittle;
-    int diference = 0;
-    diference = widths[0] - text.length() + searchColor(text);
-    size_t normalRow = calculateSizeRow();
-    size_t actualRow = simulateSizeRow(text, diference);
-    int sizeRowDiference = abs(normalRow - actualRow);
-    for (unsigned int i = 0; i < headers.size(); ++i){
-        size_t operatorDiference = calculateDiference(diference, widths[i], text);
-        if(i > 0)
-            line << SPACE_CHARACTER;
-        line << SPACE_CHARACTER * padding;
-        if(i > 0){
-            if (i == headers.size() - 1)
-                line << SPACE_CHARACTER * (widths[i] - operatorDiference - sizeRowDiference);
-            else
-                line << SPACE_CHARACTER * (widths[i] - operatorDiference);
-        } else {
-            line << text +
-                SPACE_CHARACTER * (widths[i] - operatorDiference + searchColor(text));
-        }
-        line << SPACE_CHARACTER * padding;
-    }
+    size_t innerWidth = 0;
+    for (auto width : widths)
+        innerWidth += width + padding + padding;
+    innerWidth += headers.size() - 1;
+
+    line << SPACE_CHARACTER * padding << tittle;
+    line << SPACE_CHARACTER * (innerWidth - padding - visibleLength(tittle));
     line << style.vertical;
     line << "\n";
     return line.str();
@@ -172,7 +159,7 @@ std::string ConsoleTable::getRows(const Rows &rows) const {
         line << style.vertical;
         for (unsigned int j = 0; j < row.size(); ++j) {
             std::string text = row[j];
-            line << SPACE_CHARACTER * padding + text + SPACE_CHARACTER * (widths[j] - text.length() + searchColor(text)) + SPACE_CHARACTER * padding;
+            line << SPACE_CHARACTER * padding + text + SPACE_CHARACTER * (widths[j] - visibleLength(text)) + SPACE_CHARACTER * padding;
             line << style.vertical;
         }
         line << "\n";
@@ -210,7 +197,7 @@ void ConsoleTable::updateRow(unsigned int row, unsigned int header, const std::s
 }
 
 void ConsoleTable::updateHeader(unsigned int header, const std::string &text) {
-    if (header > headers.size())
+    if (header >= headers.size())
         throw std::out_of_range{"Header index out of range."};
 
     headers[header] = text;
@@ -221,12 +208,28 @@ size_t ConsoleTable::searchColor(const std::string &text) const{
     size_t counter = 0;
     if (pos != std::string::npos){
         counter = countCharacters(counter, pos, text, COLOR_FINAL_CHARACTER);
-        size_t rpos = text.rfind("\e");
+        size_t rpos = text.rfind("\x1b");
         if (rpos  != std::string::npos && rpos > pos)
             counter = countCharacters(counter, rpos, text, COLOR_FINAL_CHARACTER);
         return counter;
     }
     return counter;
+}
+
+size_t ConsoleTable::visibleLength(const std::string &text) const{
+    size_t length = 0;
+    for (size_t i = 0; i < text.length(); i++) {
+        if (text.compare(i, COLOR_INITIATOR_CHARACTER.length(), COLOR_INITIATOR_CHARACTER) == 0) {
+            while (i < text.length() && text[i] != COLOR_FINAL_CHARACTER)
+                i++;
+            continue;
+        }
+
+        unsigned char character = static_cast<unsigned char>(text[i]);
+        if ((character & 0xC0) != 0x80)
+            length++;
+    }
+    return length;
 }
 
 std::string operator*(const std::string &other, int repeats) {

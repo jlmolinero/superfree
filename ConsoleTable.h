@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 #ifndef CONSOLETABLE_CONSOLETABLE_H
 #define CONSOLETABLE_CONSOLETABLE_H
 
@@ -141,7 +143,7 @@ private:
     const std::string SPACE_CHARACTER = " ";
 
     /// Color initiator character constant
-    const std::string COLOR_INITIATOR_CHARACTER = "\e";
+    const std::string COLOR_INITIATOR_CHARACTER = "\x1b";
 
     /// Color final character constant
     const char COLOR_FINAL_CHARACTER = 'm';
@@ -160,6 +162,8 @@ private:
     size_t calculateSizeRow(void) const;
 
     size_t simulateSizeRow(std::string text, int diference) const;
+
+    size_t visibleLength(const std::string &text) const;
 
     /// Returns a formatted header string
     /// \param headers The Headers-object that holds the header strings
@@ -185,8 +189,8 @@ private:
     /// \return Output stream with the formatted table string
     friend std::ostream &operator<<(std::ostream &out, const ConsoleTable &consoleTable);
 
-    /// Search color into the introduced text, return the number of
-    /// characters that you need to remove from the size.
+    /// Search color into the introduced text, return the number of bytes that
+    /// belong to ANSI color escape sequences.
     /// \param text variable that contain text to analize
     /// \return number of characters to remove from the size
     size_t searchColor(const std::string &text) const;
