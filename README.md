@@ -12,6 +12,9 @@ and prints memory, swap, and total usage in a colored table.
 - Memory, swap, and combined total usage at a glance.
 - Colored usage bars: green for low usage, yellow for medium usage, and red for
   high usage.
+- Machine-readable JSON output for scripts and dashboards.
+- `free`-compatible flags for units, totals, wide/line output, commit memory,
+  repeated sampling, and version/help output.
 - No runtime dependencies beyond a Linux system with `/proc/meminfo`.
 - Simple CMake-based build.
 
@@ -62,8 +65,32 @@ Choose a specific unit when needed:
 ./build/superfree --unit GiB
 ```
 
-Supported units are `kB`, `KiB`, `MiB`, `GiB`, and `TiB`. The legacy `--human`
-modifier is still accepted, but human-readable output is now the default.
+Supported `--unit` values are `auto`, `B`, `kB`, `KiB`, `MB`, `MiB`, `GB`,
+`GiB`, `TB`, `TiB`, `PB`, and `PiB`. The legacy `--human` modifier is still
+accepted, but human-readable output is now the default.
+
+Machine-readable JSON:
+
+```bash
+./build/superfree --json
+./build/superfree --json --unit MiB
+```
+
+The JSON payload contains `memory`, `swap`, and combined `total` objects with
+numeric values in the selected unit plus usage percentages.
+
+`free`-compatible text output is available with the familiar flags:
+
+```bash
+./build/superfree --bytes --total --wide
+./build/superfree -h --total
+./build/superfree --line --bytes --total --committed
+```
+
+Supported `free`-style options include `--bytes`, `--kilo`, `--mega`, `--giga`,
+`--tera`, `--peta`, `--kibi`/`-k`, `--mebi`/`-m`, `--gibi`/`-g`, `--tebi`,
+`--pebi`, `-h`, `--si`, `--lohi`, `--line`, `--total`, `--committed`,
+`--seconds`, `--count`, and `--version`.
 
 Control colors:
 
@@ -132,6 +159,12 @@ Run a quick smoke test:
 
 ```bash
 ./build/superfree
+```
+
+Run the automated CLI test suite:
+
+```bash
+ctest --test-dir build --output-on-failure
 ```
 
 ## License
