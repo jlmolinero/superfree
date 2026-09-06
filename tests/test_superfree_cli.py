@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import subprocess
 import tempfile
 import unittest
@@ -38,7 +39,7 @@ class SuperfreeCliTest(unittest.TestCase):
         subprocess.run(["cmake", "-S", str(ROOT), "-B", str(ROOT / "build")], check=True, cwd=ROOT)
         subprocess.run(["cmake", "--build", str(ROOT / "build")], check=True, cwd=ROOT)
 
-    def run_superfree(self, *args, check=True):
+    def run_superfree(self, *args, check=True, columns=None):
         with tempfile.NamedTemporaryFile("w", delete=False) as handle:
             handle.write(FAKE_MEMINFO)
             meminfo_path = handle.name
@@ -47,6 +48,8 @@ class SuperfreeCliTest(unittest.TestCase):
             env = os.environ.copy()
             env["SUPERFREE_MEMINFO"] = meminfo_path
             env["NO_COLOR"] = "1"
+            if columns is not None:
+                env["COLUMNS"] = str(columns)
             result = subprocess.run(
                 [str(BINARY), *args],
                 cwd=ROOT,
@@ -62,6 +65,17 @@ class SuperfreeCliTest(unittest.TestCase):
         if check and result.returncode != 0:
             self.fail(f"superfree exited {result.returncode}\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}")
         return result
+
+    def visible_width(self, line):
+        plain = re.sub(r"\x1b\[[0-9;]*m", "", line)
+        return len(plain)
+
+    def assert_table_fits_and_is_aligned(self, output, columns):
+        table_lines = [line.rstrip() for line in output.splitlines() if line.strip()]
+        widths = [self.visible_width(line) for line in table_lines]
+        self.assertTrue(widths, "expected table output")
+        self.assertLessEqual(max(widths), columns)
+        self.assertEqual(len(set(widths)), 1, widths)
 
     def test_json_output_is_machine_readable_and_uses_selected_unit(self):
         result = self.run_superfree("--json", "--unit", "MiB")
@@ -126,6 +140,35 @@ class SuperfreeCliTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("unknown option: --definitely-not-real", result.stderr)
         self.assertIn("Try 'superfree --help'", result.stderr)
+
+    def test_default_table_adapts_to_terminal_width(self):
+        result = self.run_superfree("--color", "never", columns=60)
+
+        self.assert_table_fits_and_is_aligned(result.stdout, 60)
+        self.assertIn("TYPE", result.stdout)
+        self.assertIn("USE%", result.stdout)
+        self.assertNotIn("BUF/CACHE", result.stdout)
+        self.assertNotIn("AVAILABLE", result.stdout)
+
+    def test_default_table_keeps_medium_layout_within_terminal_width(self):
+        result = self.run_superfree("--color", "never", columns=100)
+
+        self.assert_table_fits_and_is_aligned(result.stdout, 100)
+        self.assertIn("TYPE", result.stdout)
+        self.assertIn("TOTAL", result.stdout)
+        self.assertIn("USED", result.stdout)
+        self.assertIn("FREE", result.stdout)
+        self.assertIn("USE%", result.stdout)
+
+    def test_default_table_has_ultra_compact_layout_for_tiny_terminals(self):
+        result = self.run_superfree("--color", "never", columns=40)
+
+        self.assert_table_fits_and_is_aligned(result.stdout, 40)
+        self.assertIn("TYPE", result.stdout)
+        self.assertIn("USED", result.stdout)
+        self.assertIn("USE%", result.stdout)
+        self.assertNotIn("TOTAL", result.stdout)
+        self.assertNotIn("FREE", result.stdout)
 
 
 if __name__ == "__main__":

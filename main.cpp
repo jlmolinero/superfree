@@ -11,6 +11,7 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <sys/ioctl.h>
 #include <unistd.h>
 
 #include "ConsoleTable.h"
@@ -304,7 +305,9 @@ bool parseArgs(int argc, char *argv[], Options &options, std::string &error) {
 }
 
 struct DisplayValue {
-    double value = 0.0;
+    DisplayValue(double value, const std::string &unit) : value(value), unit(unit) {}
+
+    double value;
     std::string unit;
 };
 
@@ -368,6 +371,21 @@ double percentage(long long used, long long total) {
     return (static_cast<double>(used) * 100.0) / static_cast<double>(total);
 }
 
+int terminalColumns() {
+    struct winsize size;
+    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &size) == 0 && size.ws_col > 0)
+        return size.ws_col;
+
+    const char *columns = std::getenv("COLUMNS");
+    if (columns && *columns) {
+        const long long parsed = toLongLong(columns, 0);
+        if (parsed > 0)
+            return static_cast<int>(parsed);
+    }
+
+    return 100;
+}
+
 std::string usageColor(double pct, const ColorSettings &colorSettings) {
     if (!colorSettings.enabled)
         return "";
@@ -380,13 +398,17 @@ std::string resetColor(const ColorSettings &colorSettings) {
     return colorSettings.enabled ? "\x1b[0m" : "";
 }
 
-std::string usageBar(long long used, long long total, const ColorSettings &colorSettings) {
+std::string usageBar(long long used, long long total, const ColorSettings &colorSettings, int barWidth = 22, bool compact = false) {
     const double pct = percentage(used, total);
-    const int hashes = static_cast<int>(std::round((pct * 22.0) / 100.0));
+    if (compact && barWidth <= 0)
+        return usageColor(pct, colorSettings) + numberString(pct, 0) + "%" + resetColor(colorSettings);
+
+    const int width = std::max(4, barWidth);
+    const int hashes = static_cast<int>(std::round((pct * width) / 100.0));
     std::string result = usageColor(pct, colorSettings) + "[";
-    for (int i = 0; i < 22; ++i)
+    for (int i = 0; i < width; ++i)
         result += i < hashes ? "#" : ".";
-    result += "] " + numberString(pct, 1) + " %" + resetColor(colorSettings);
+    result += "] " + numberString(pct, compact ? 0 : 1) + (compact ? "%" : " %") + resetColor(colorSettings);
     return result;
 }
 
@@ -502,10 +524,63 @@ void printFreeCompatible(const MemInfo &info, const Metrics &metrics, const Opti
 
 void printSuperTable(const MemInfo &info, const Metrics &metrics, const Options &options) {
     const Labels labels = getLabels();
+    const int columns = terminalColumns();
+    const bool tiny = columns < 52;
+    const bool compact = !tiny && columns < 72;
+    const bool medium = !compact && columns < 112;
+    const int barWidth = compact ? 0 : (medium ? 10 : 22);
     const std::string memoryColor = usageColor(percentage(metrics.memUsed, info.memTotal), options.colorSettings);
     const std::string swapColor = usageColor(percentage(metrics.swapUsed, info.swapTotal), options.colorSettings);
     const std::string totalsColor = usageColor(percentage(metrics.totalUsed, metrics.total), options.colorSettings);
     const std::string reset = resetColor(options.colorSettings);
+
+    if (tiny) {
+        ConsoleTable tableMemory{"TYPE", labels.used, labels.usePercent};
+        tableMemory.setPadding(1);
+        tableMemory.setStyle(4);
+
+        tableMemory += {memoryColor + labels.memoryTitle + reset,
+                memoryColor + tableValue(metrics.memUsed, options) + reset,
+                usageBar(metrics.memUsed, info.memTotal, options.colorSettings, 0, true)};
+        tableMemory += {swapColor + labels.swapTitle + reset,
+                swapColor + tableValue(metrics.swapUsed, options) + reset,
+                usageBar(metrics.swapUsed, info.swapTotal, options.colorSettings, 0, true)};
+        tableMemory += {totalsColor + labels.totalsTitle + reset,
+                totalsColor + tableValue(metrics.totalUsed, options) + reset,
+                usageBar(metrics.totalUsed, metrics.total, options.colorSettings, 0, true)};
+
+        tableMemory.setTittle("Mem");
+        std::cout << tableMemory;
+        return;
+    }
+
+    if (compact || medium) {
+        ConsoleTable tableMemory{"TYPE", labels.total, labels.used, labels.free, labels.usePercent};
+        tableMemory.setPadding(1);
+        tableMemory.setStyle(4);
+
+        tableMemory += {memoryColor + labels.memoryTitle + reset,
+                memoryColor + tableValue(info.memTotal, options) + reset,
+                memoryColor + tableValue(metrics.memUsed, options) + reset,
+                tableValue(info.memFree, options),
+                usageBar(metrics.memUsed, info.memTotal, options.colorSettings, barWidth, compact)};
+
+        tableMemory += {swapColor + labels.swapTitle + reset,
+                swapColor + tableValue(info.swapTotal, options) + reset,
+                swapColor + tableValue(metrics.swapUsed, options) + reset,
+                tableValue(info.swapFree, options),
+                usageBar(metrics.swapUsed, info.swapTotal, options.colorSettings, barWidth, compact)};
+
+        tableMemory += {totalsColor + labels.totalsTitle + reset,
+                totalsColor + tableValue(metrics.total, options) + reset,
+                totalsColor + tableValue(metrics.totalUsed, options) + reset,
+                tableValue(metrics.totalFree, options),
+                usageBar(metrics.totalUsed, metrics.total, options.colorSettings, barWidth, compact)};
+
+        tableMemory.setTittle(compact ? "Memory" : "Memory Usage");
+        std::cout << tableMemory;
+        return;
+    }
 
     ConsoleTable tableMemory{"TYPE", labels.total, labels.used, labels.free, labels.buffCache, labels.available, labels.usePercent};
     tableMemory.setPadding(1);
@@ -517,7 +592,7 @@ void printSuperTable(const MemInfo &info, const Metrics &metrics, const Options 
             tableValue(info.memFree, options),
             tableValue(metrics.buffCache, options),
             tableValue(info.memAvailable, options),
-            usageBar(metrics.memUsed, info.memTotal, options.colorSettings)};
+            usageBar(metrics.memUsed, info.memTotal, options.colorSettings, barWidth)};
 
     tableMemory += {swapColor + labels.swapTitle + reset,
             swapColor + tableValue(info.swapTotal, options) + reset,
@@ -525,7 +600,7 @@ void printSuperTable(const MemInfo &info, const Metrics &metrics, const Options 
             tableValue(info.swapFree, options),
             "-",
             "-",
-            usageBar(metrics.swapUsed, info.swapTotal, options.colorSettings)};
+            usageBar(metrics.swapUsed, info.swapTotal, options.colorSettings, barWidth)};
 
     tableMemory += {totalsColor + labels.totalsTitle + reset,
             totalsColor + tableValue(metrics.total, options) + reset,
@@ -533,7 +608,7 @@ void printSuperTable(const MemInfo &info, const Metrics &metrics, const Options 
             tableValue(metrics.totalFree, options),
             "-",
             "-",
-            usageBar(metrics.totalUsed, metrics.total, options.colorSettings)};
+            usageBar(metrics.totalUsed, metrics.total, options.colorSettings, barWidth)};
 
     tableMemory.setTittle("Memory Usage");
     std::cout << tableMemory;

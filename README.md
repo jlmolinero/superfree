@@ -15,6 +15,8 @@ and prints memory, swap, and total usage in a colored table.
 - Machine-readable JSON output for scripts and dashboards.
 - `free`-compatible flags for units, totals, wide/line output, commit memory,
   repeated sampling, and version/help output.
+- Dynamic table layout that detects terminal width and hides low-priority
+  columns on narrow terminals to keep rows aligned.
 - No runtime dependencies beyond a Linux system with `/proc/meminfo`.
 - Simple CMake-based build.
 
@@ -111,6 +113,10 @@ Memory usage is highlighted by threshold:
 
 The `TYPE`, `TOTAL`, `USED`, and `USE%` cells use the threshold color for each
 row.
+
+The default table adapts to terminal width automatically. Wide terminals show
+the full `BUF/CACHE`, `AVAILABLE`, and usage-bar columns; narrower terminals
+collapse to compact summaries so every table row still fits and stays aligned.
 
 Show help:
 
