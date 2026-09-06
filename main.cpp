@@ -169,7 +169,7 @@ Metrics calculateMetrics(const MemInfo &info) {
 }
 
 void printHelp() {
-    std::cout << "Usage: superfree [OPTIONS]\n\n"
+    std::cout << "Usage: sfree [OPTIONS]\n\n"
               << "Display Linux memory and swap usage as a colorful table, free-compatible text, or JSON.\n\n"
               << "Output options:\n"
               << "      --json              Print machine-readable JSON.\n"
@@ -195,9 +195,9 @@ void printHelp() {
               << "      --help              Show this help and exit.\n"
               << "  -V, --version           Show version and exit.\n\n"
               << "Examples:\n"
-              << "  superfree\n"
-              << "  superfree --json --unit MiB\n"
-              << "  superfree --bytes --total --wide\n";
+              << "  sfree\n"
+              << "  sfree --json --unit MiB\n"
+              << "  sfree --bytes --total --wide\n";
 }
 
 std::string optionNeedsValue(const std::string &option) {
@@ -223,7 +223,7 @@ bool parseArgs(int argc, char *argv[], Options &options, std::string &error) {
         } else if (arg == "--help") {
             options.showHelp = true;
         } else if (arg == "-V" || arg == "--version") {
-            std::cout << "superfree 0.1.0\n";
+            std::cout << "sfree 0.1.0\n";
             std::exit(0);
         } else if (arg == "--json") {
             options.json = true;
@@ -618,7 +618,7 @@ void printOnce(const Options &options) {
     MemInfo info;
     std::string error;
     if (!readMeminfo(info, error)) {
-        std::cerr << "superfree: " << error << "\n";
+        std::cerr << "sfree: " << error << "\n";
         std::exit(1);
     }
 
@@ -637,7 +637,7 @@ int main(int argc, char *argv[]) {
     Options options;
     std::string error;
     if (!parseArgs(argc, argv, options, error)) {
-        std::cerr << "superfree: " << error << "\nTry 'superfree --help' for more information.\n";
+        std::cerr << "sfree: " << error << "\nTry 'sfree --help' for more information.\n";
         return 2;
     }
 

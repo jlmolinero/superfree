@@ -1,11 +1,11 @@
-# superfree
+# sfree
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
-`superfree` is a small Linux command-line utility that reads `/proc/meminfo`
+`sfree` is a small Linux command-line utility that reads `/proc/meminfo`
 and prints memory, swap, and total usage in a colored table.
 
-![superfree screenshot](https://github.com/user-attachments/assets/c53f43b2-1a8d-4c8a-bc92-33be37d09f60)
+![sfree screenshot](assets/sfree-screenshot.png)
 
 ## Features
 
@@ -50,21 +50,21 @@ cmake --build build
 ## Run
 
 ```bash
-./build/superfree
+./build/sfree
 ```
 
 Output is human-readable by default:
 
 ```bash
-./build/superfree
+./build/sfree
 ```
 
 Choose a specific unit when needed:
 
 ```bash
-./build/superfree --unit kB
-./build/superfree --unit MiB
-./build/superfree --unit GiB
+./build/sfree --unit kB
+./build/sfree --unit MiB
+./build/sfree --unit GiB
 ```
 
 Supported `--unit` values are `auto`, `B`, `kB`, `KiB`, `MB`, `MiB`, `GB`,
@@ -74,8 +74,8 @@ accepted, but human-readable output is now the default.
 Machine-readable JSON:
 
 ```bash
-./build/superfree --json
-./build/superfree --json --unit MiB
+./build/sfree --json
+./build/sfree --json --unit MiB
 ```
 
 The JSON payload contains `memory`, `swap`, and combined `total` objects with
@@ -84,9 +84,9 @@ numeric values in the selected unit plus usage percentages.
 `free`-compatible text output is available with the familiar flags:
 
 ```bash
-./build/superfree --bytes --total --wide
-./build/superfree -h --total
-./build/superfree --line --bytes --total --committed
+./build/sfree --bytes --total --wide
+./build/sfree -h --total
+./build/sfree --line --bytes --total --committed
 ```
 
 Supported `free`-style options include `--bytes`, `--kilo`, `--mega`, `--giga`,
@@ -97,9 +97,9 @@ Supported `free`-style options include `--bytes`, `--kilo`, `--mega`, `--giga`,
 Control colors:
 
 ```bash
-./build/superfree --color auto
-./build/superfree --color always
-./build/superfree --color never
+./build/sfree --color auto
+./build/sfree --color always
+./build/sfree --color never
 ```
 
 Colors are enabled by default. Use `--color never` only when you want plain
@@ -121,7 +121,7 @@ collapse to compact summaries so every table row still fits and stays aligned.
 Show help:
 
 ```bash
-./build/superfree --help
+./build/sfree --help
 ```
 
 ## Install
@@ -130,10 +130,14 @@ Show help:
 sudo cmake --install build
 ```
 
+With the default `/usr/local` install prefix, the install step places the binary
+at `/usr/local/bin/sfree` and also creates `/usr/bin/sfree` as a symlink to it,
+so the command is available from either standard binary directory.
+
 After installation, run it from anywhere:
 
 ```bash
-superfree
+sfree
 ```
 
 ## What the columns mean
@@ -164,7 +168,7 @@ cmake --build build
 Run a quick smoke test:
 
 ```bash
-./build/superfree
+./build/sfree
 ```
 
 Run the automated CLI test suite:

@@ -3,6 +3,7 @@
 import json
 import os
 import re
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -10,7 +11,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-BINARY = ROOT / "build" / "superfree"
+BINARY = ROOT / "build" / "sfree"
 
 FAKE_MEMINFO = """\
 MemTotal:        4096000 kB
@@ -31,7 +32,7 @@ Committed_AS:    2048000 kB
 """
 
 
-class SuperfreeCliTest(unittest.TestCase):
+class SfreeCliTest(unittest.TestCase):
     maxDiff = None
 
     @classmethod
@@ -39,7 +40,7 @@ class SuperfreeCliTest(unittest.TestCase):
         subprocess.run(["cmake", "-S", str(ROOT), "-B", str(ROOT / "build")], check=True, cwd=ROOT)
         subprocess.run(["cmake", "--build", str(ROOT / "build")], check=True, cwd=ROOT)
 
-    def run_superfree(self, *args, check=True, columns=None):
+    def run_sfree(self, *args, check=True, columns=None):
         with tempfile.NamedTemporaryFile("w", delete=False) as handle:
             handle.write(FAKE_MEMINFO)
             meminfo_path = handle.name
@@ -63,8 +64,48 @@ class SuperfreeCliTest(unittest.TestCase):
             os.unlink(meminfo_path)
 
         if check and result.returncode != 0:
-            self.fail(f"superfree exited {result.returncode}\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}")
+            self.fail(f"sfree exited {result.returncode}\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}")
         return result
+
+    def test_binary_and_help_use_sfree_command_name(self):
+        self.assertTrue(BINARY.exists())
+
+        help_result = self.run_sfree("--help")
+        version_result = self.run_sfree("--version")
+        invalid_result = self.run_sfree("--definitely-not-real", check=False)
+
+        self.assertIn("Usage: sfree [OPTIONS]", help_result.stdout)
+        self.assertIn("  sfree --json --unit MiB", help_result.stdout)
+        self.assertEqual(version_result.stdout.strip(), "sfree 0.1.0")
+        self.assertIn("sfree: unknown option: --definitely-not-real", invalid_result.stderr)
+        self.assertIn("Try 'sfree --help'", invalid_result.stderr)
+
+    def test_install_creates_usr_bin_symlink_when_prefix_is_usr_local(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            temp_root = Path(tmp)
+            build_dir = temp_root / "build"
+            prefix = temp_root / "usr" / "local"
+            usr_bin = temp_root / "usr" / "bin"
+
+            subprocess.run([
+                "cmake",
+                "-S",
+                str(ROOT),
+                "-B",
+                str(build_dir),
+                f"-DCMAKE_INSTALL_PREFIX={prefix}",
+                f"-DSFREE_USR_BIN_DIR={usr_bin}",
+            ], check=True, cwd=ROOT)
+            subprocess.run(["cmake", "--build", str(build_dir)], check=True, cwd=ROOT)
+            subprocess.run(["cmake", "--install", str(build_dir)], check=True, cwd=ROOT)
+
+            installed_binary = prefix / "bin" / "sfree"
+            symlink = usr_bin / "sfree"
+
+            self.assertTrue(installed_binary.exists())
+            self.assertTrue(symlink.is_symlink())
+            self.assertEqual(os.readlink(symlink), str(installed_binary))
+            self.assertEqual(shutil.which("sfree", path=str(usr_bin)), str(symlink))
 
     def visible_width(self, line):
         plain = re.sub(r"\x1b\[[0-9;]*m", "", line)
@@ -78,7 +119,7 @@ class SuperfreeCliTest(unittest.TestCase):
         self.assertEqual(len(set(widths)), 1, widths)
 
     def test_json_output_is_machine_readable_and_uses_selected_unit(self):
-        result = self.run_superfree("--json", "--unit", "MiB")
+        result = self.run_sfree("--json", "--unit", "MiB")
 
         payload = json.loads(result.stdout)
 
@@ -94,7 +135,7 @@ class SuperfreeCliTest(unittest.TestCase):
         self.assertEqual(payload["total"], {"total": 5000.0, "used": 2750.0, "free": 1250.0, "usage_percent": 55.0})
 
     def test_free_compatible_bytes_total_wide_output(self):
-        result = self.run_superfree("--bytes", "--total", "--wide")
+        result = self.run_sfree("--bytes", "--total", "--wide")
 
         lines = [line.rstrip() for line in result.stdout.splitlines()]
 
@@ -115,7 +156,7 @@ class SuperfreeCliTest(unittest.TestCase):
         self.assertIn("5242880000", lines[3])
 
     def test_free_compatible_line_output_includes_requested_rows(self):
-        result = self.run_superfree("--line", "--bytes", "--total", "--committed")
+        result = self.run_sfree("--line", "--bytes", "--total", "--committed")
 
         output = result.stdout.strip()
 
@@ -127,7 +168,7 @@ class SuperfreeCliTest(unittest.TestCase):
         self.assertIn("Committed_AS 2097152000", output)
 
     def test_free_short_h_means_human_readable_not_help(self):
-        result = self.run_superfree("-h", "--total")
+        result = self.run_sfree("-h", "--total")
 
         self.assertIn("Mem:", result.stdout)
         self.assertIn("Swap:", result.stdout)
@@ -135,14 +176,14 @@ class SuperfreeCliTest(unittest.TestCase):
         self.assertNotIn("Usage:", result.stdout)
 
     def test_invalid_option_exits_nonzero_with_clear_error(self):
-        result = self.run_superfree("--definitely-not-real", check=False)
+        result = self.run_sfree("--definitely-not-real", check=False)
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("unknown option: --definitely-not-real", result.stderr)
-        self.assertIn("Try 'superfree --help'", result.stderr)
+        self.assertIn("Try 'sfree --help'", result.stderr)
 
     def test_default_table_adapts_to_terminal_width(self):
-        result = self.run_superfree("--color", "never", columns=60)
+        result = self.run_sfree("--color", "never", columns=60)
 
         self.assert_table_fits_and_is_aligned(result.stdout, 60)
         self.assertIn("TYPE", result.stdout)
@@ -151,7 +192,7 @@ class SuperfreeCliTest(unittest.TestCase):
         self.assertNotIn("AVAILABLE", result.stdout)
 
     def test_default_table_keeps_medium_layout_within_terminal_width(self):
-        result = self.run_superfree("--color", "never", columns=100)
+        result = self.run_sfree("--color", "never", columns=100)
 
         self.assert_table_fits_and_is_aligned(result.stdout, 100)
         self.assertIn("TYPE", result.stdout)
@@ -161,7 +202,7 @@ class SuperfreeCliTest(unittest.TestCase):
         self.assertIn("USE%", result.stdout)
 
     def test_default_table_has_ultra_compact_layout_for_tiny_terminals(self):
-        result = self.run_superfree("--color", "never", columns=40)
+        result = self.run_sfree("--color", "never", columns=40)
 
         self.assert_table_fits_and_is_aligned(result.stdout, 40)
         self.assertIn("TYPE", result.stdout)

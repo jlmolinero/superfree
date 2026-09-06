@@ -1,6 +1,6 @@
 # Improvement ideas
 
-This is a short backlog of practical improvements for `superfree`, ordered from
+This is a short backlog of practical improvements for `sfree`, ordered from
 low-risk polish to larger product changes.
 
 ## Near-term improvements
