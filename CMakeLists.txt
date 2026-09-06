@@ -3,7 +3,7 @@
 cmake_minimum_required(VERSION 3.10)
 
 project(sfree
-    VERSION 0.1.0
+    VERSION 1.0.1
     DESCRIPTION "A nicer presentation for Linux memory usage"
     LANGUAGES CXX
 )

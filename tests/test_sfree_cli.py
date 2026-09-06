@@ -76,7 +76,7 @@ class SfreeCliTest(unittest.TestCase):
 
         self.assertIn("Usage: sfree [OPTIONS]", help_result.stdout)
         self.assertIn("  sfree --json --unit MiB", help_result.stdout)
-        self.assertEqual(version_result.stdout.strip(), "sfree 0.1.0")
+        self.assertEqual(version_result.stdout.strip(), "sfree 1.0.1")
         self.assertIn("sfree: unknown option: --definitely-not-real", invalid_result.stderr)
         self.assertIn("Try 'sfree --help'", invalid_result.stderr)
 

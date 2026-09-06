@@ -223,7 +223,7 @@ bool parseArgs(int argc, char *argv[], Options &options, std::string &error) {
         } else if (arg == "--help") {
             options.showHelp = true;
         } else if (arg == "-V" || arg == "--version") {
-            std::cout << "sfree 0.1.0\n";
+            std::cout << "sfree 1.0.1\n";
             std::exit(0);
         } else if (arg == "--json") {
             options.json = true;
