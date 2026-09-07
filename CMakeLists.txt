@@ -26,8 +26,9 @@ if(BUILD_TESTING)
 endif()
 
 install(TARGETS sfree RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(FILES man/sfree.1 DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
 install(CODE "
-    if(\"\${CMAKE_INSTALL_PREFIX}\" MATCHES \"/usr/local$\")
+    if(\"\${CMAKE_INSTALL_PREFIX}\" STREQUAL \"/usr/local\" OR NOT \"${SFREE_USR_BIN_DIR}\" STREQUAL \"/usr/bin\")
         file(MAKE_DIRECTORY \"${SFREE_USR_BIN_DIR}\")
         execute_process(
             COMMAND \"${CMAKE_COMMAND}\" -E create_symlink

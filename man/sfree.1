@@ -1,0 +1,152 @@
+.\" SPDX-License-Identifier: GPL-3.0-only
+.TH SFREE 1 "September 2026" "sfree 1.0.1" "User Commands"
+.SH NAME
+sfree \- display Linux memory and swap usage
+.SH SYNOPSIS
+.B sfree
+.RI [ OPTIONS ]
+.SH DESCRIPTION
+.B sfree
+reads
+.I /proc/meminfo
+and displays memory, swap, and total usage.
+By default it prints a colored table that adapts to the terminal width.
+It can also print machine-readable JSON or output compatible with common
+.BR free (1)
+options.
+.SH OPTIONS
+.TP
+.B --json
+Print machine-readable JSON with memory, swap, and combined total objects.
+.TP
+.BI --unit " UNIT"
+Force the output unit. Supported values are
+.BR auto ,
+.BR B ,
+.BR kB ,
+.BR KiB ,
+.BR MB ,
+.BR MiB ,
+.BR GB ,
+.BR GiB ,
+.BR TB ,
+.BR TiB ,
+.BR PB ,
+and
+.BR PiB .
+.TP
+.BI --color " WHEN"
+Control ANSI color output in the default table.
+.I WHEN
+can be
+.BR always ,
+.BR auto ,
+or
+.BR never .
+The default is
+.BR always .
+.TP
+.B --human
+Use automatic human-readable units. This is the default in table and JSON mode.
+.TP
+.BR -b , " --bytes"
+Show values in bytes in free-compatible output.
+.TP
+.BR --kilo , " --mega" , " --giga" , " --tera" , " --peta"
+Show values in decimal kilobytes, megabytes, gigabytes, terabytes, or petabytes.
+.TP
+.BR -k , " --kibi"
+Show values in kibibytes.
+.TP
+.BR -m , " --mebi"
+Show values in mebibytes.
+.TP
+.BR -g , " --gibi"
+Show values in gibibytes.
+.TP
+.BR --tebi , " --pebi"
+Show values in tebibytes or pebibytes.
+.TP
+.B -h
+Show human-readable free-compatible output.
+Unlike many commands, help is only available through
+.BR --help
+so that
+.B -h
+matches
+.BR free (1)
+behavior.
+.TP
+.B --si
+Use powers of 1000 instead of powers of 1024 for human-readable output.
+.TP
+.BR -l , " --lohi"
+Show high and low memory rows when the kernel exposes them.
+.TP
+.BR -L , " --line"
+Show output on a single line.
+.TP
+.BR -t , " --total"
+Show the combined RAM plus swap total row.
+.TP
+.BR -v , " --committed"
+Show commit limit and committed memory.
+.TP
+.BI -s " N" , " --seconds " N
+Repeat output every
+.I N
+seconds.
+.TP
+.BI -c " N" , " --count " N
+Repeat output
+.I N
+times and then exit.
+.TP
+.B --help
+Show help and exit.
+.TP
+.BR -V , " --version"
+Show version information and exit.
+.SH ENVIRONMENT
+.TP
+.B COLUMNS
+Used as a fallback terminal width when stdout is not attached to a TTY.
+.TP
+.B NO_COLOR
+Disables ANSI color output unless colors are explicitly forced by future modes.
+.TP
+.B SUPERFREE_MEMINFO
+Override the meminfo path. This is primarily intended for automated tests.
+.SH EXAMPLES
+.TP
+Show the adaptive default table:
+.B sfree
+.TP
+Print JSON in MiB:
+.B sfree --json --unit MiB
+.TP
+Print free-compatible wide byte output with totals:
+.B sfree --bytes --total --wide
+.TP
+Print a compact one-line output with committed memory:
+.B sfree --line --bytes --total --committed
+.SH FILES
+.TP
+.I /proc/meminfo
+Kernel memory information read by
+.BR sfree .
+.SH EXIT STATUS
+.TP
+.B 0
+Success.
+.TP
+.B 1
+Runtime error, such as being unable to read meminfo.
+.TP
+.B 2
+Invalid command-line option or option value.
+.SH SEE ALSO
+.BR free (1),
+.BR proc_meminfo (5)
+.SH AUTHORS
+sfree is maintained by Javier Molinero.

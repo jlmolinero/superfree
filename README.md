@@ -1,6 +1,7 @@
 # sfree
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
+[![CI](https://github.com/jlmolinero/superfree/actions/workflows/ci.yml/badge.svg)](https://github.com/jlmolinero/superfree/actions/workflows/ci.yml)
 
 `sfree` is a small Linux command-line utility that reads `/proc/meminfo`
 and prints memory, swap, and total usage in a colored table.
@@ -132,12 +133,19 @@ sudo cmake --install build
 
 With the default `/usr/local` install prefix, the install step places the binary
 at `/usr/local/bin/sfree` and also creates `/usr/bin/sfree` as a symlink to it,
-so the command is available from either standard binary directory.
+so the command is available from either standard binary directory. It also
+installs the `sfree(1)` man page.
 
 After installation, run it from anywhere:
 
 ```bash
 sfree
+```
+
+Read the manual page:
+
+```bash
+man sfree
 ```
 
 ## What the columns mean

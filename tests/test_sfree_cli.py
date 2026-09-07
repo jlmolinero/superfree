@@ -101,11 +101,14 @@ class SfreeCliTest(unittest.TestCase):
 
             installed_binary = prefix / "bin" / "sfree"
             symlink = usr_bin / "sfree"
+            manpage = prefix / "share" / "man" / "man1" / "sfree.1"
 
             self.assertTrue(installed_binary.exists())
             self.assertTrue(symlink.is_symlink())
             self.assertEqual(os.readlink(symlink), str(installed_binary))
             self.assertEqual(shutil.which("sfree", path=str(usr_bin)), str(symlink))
+            self.assertTrue(manpage.exists())
+            self.assertIn("sfree", manpage.read_text())
 
     def visible_width(self, line):
         plain = re.sub(r"\x1b\[[0-9;]*m", "", line)
